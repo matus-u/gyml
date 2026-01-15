@@ -3,6 +3,8 @@ package gyml
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -12,7 +14,20 @@ var (
 	ErrKeyNotFound        = errors.New("error: key not found")
 	ErrEmptyDocumentNode  = errors.New("error: empty document node provided")
 	ErrUnexpectedNodeKind = errors.New("error: unexpected node kind provided")
+	ErrInvalidIndexFormat = errors.New("error: invalid index format")
+	ErrIndexOutOfBound    = errors.New("error: provided index out of bound")
 )
+
+func normalizeEmptySlice[T any](v *T) {
+	if v == nil {
+		return
+	}
+
+	rv := reflect.ValueOf(v).Elem()
+	if rv.Kind() == reflect.Slice && rv.IsNil() {
+		rv.Set(reflect.MakeSlice(rv.Type(), 0, 0))
+	}
+}
 
 // Returns values on the path defined by list of keys
 // Examples:
@@ -32,8 +47,27 @@ func GetValue[DataType any](rootNode *yaml.Node, keys ...string) (*DataType, err
 	if err := node.Decode(&value); err != nil {
 		return nil, fmt.Errorf("GetValue: cannot unmarshall yaml node value: %w", err)
 	}
+	normalizeEmptySlice(&value)
 	return &value, nil
 
+}
+
+func parseValidIndex(indexStr string) (int, error) {
+	if len(indexStr) < 3 {
+		return 0, ErrInvalidIndexFormat
+	}
+
+	if indexStr[0] != '[' || indexStr[len(indexStr)-1] != ']' {
+		return 0, ErrInvalidIndexFormat
+	}
+
+	index, err := strconv.Atoi(indexStr[1 : len(indexStr)-1])
+
+	if err != nil {
+		return 0, ErrInvalidIndexFormat
+	}
+
+	return index, nil
 }
 
 func getValue(node *yaml.Node, keys ...string) (*yaml.Node, error) {
@@ -50,6 +84,19 @@ func getValue(node *yaml.Node, keys ...string) (*yaml.Node, error) {
 		return getValue(node.Content[0], keys...)
 	}
 
+	if node.Kind == yaml.SequenceNode {
+		index, err := parseValidIndex(keys[0])
+		if err != nil {
+			return nil, err
+		}
+
+		if index < 0 || index >= len(node.Content) {
+			return nil, ErrIndexOutOfBound
+		}
+
+		return getValue(node.Content[index], keys[1:]...)
+	}
+
 	if node.Kind == yaml.MappingNode {
 		// Content is sorted as key1,value1,key2,value2...
 		for i := 0; i < len(node.Content); i += 2 {
@@ -57,6 +104,7 @@ func getValue(node *yaml.Node, keys ...string) (*yaml.Node, error) {
 				return getValue(node.Content[i+1], keys[1:]...)
 			}
 		}
+		return nil, ErrKeyNotFound
 	}
 
 	return nil, ErrUnexpectedNodeKind
