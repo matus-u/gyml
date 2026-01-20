@@ -4,29 +4,33 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 var (
-	ErrRootNodeNotSet     = errors.New("error: rootNode not set")
-	ErrKeyNotFound        = errors.New("error: key not found")
-	ErrEmptyDocumentNode  = errors.New("error: empty document node provided")
-	ErrUnexpectedNodeKind = errors.New("error: unexpected node kind provided")
-	ErrInvalidIndexFormat = errors.New("error: invalid index format")
-	ErrIndexOutOfBound    = errors.New("error: provided index out of bound")
+	ErrRootNodeNotSet     = errors.New("rootNode not set")
+	ErrKeyNotFound        = errors.New("key not found")
+	ErrEmptyDocumentNode  = errors.New("empty document node provided")
+	ErrUnexpectedNodeKind = errors.New("unexpected node kind provided")
+	ErrInvalidIndexFormat = errors.New("invalid index format")
+	ErrIndexOutOfBound    = errors.New("provided index out of bound")
+	ErrInvalidKeysList    = errors.New("invalid keys list")
 )
 
-func normalizeEmptySlice[T any](v *T) {
-	if v == nil {
-		return
+func DeleteValue(root *yaml.Node, keys ...string) error {
+
+	if len(keys) == 0 {
+		return ErrInvalidKeysList
 	}
 
-	rv := reflect.ValueOf(v).Elem()
-	if rv.Kind() == reflect.Slice && rv.IsNil() {
-		rv.Set(reflect.MakeSlice(rv.Type(), 0, 0))
+	if root == nil {
+		return ErrRootNodeNotSet
 	}
+	return deleteValue(root, keys...)
 }
 
 // Returns values on the path defined by list of keys
@@ -104,8 +108,68 @@ func getValue(node *yaml.Node, keys ...string) (*yaml.Node, error) {
 				return getValue(node.Content[i+1], keys[1:]...)
 			}
 		}
-		return nil, ErrKeyNotFound
+		return nil, fmt.Errorf("%w: %s", ErrKeyNotFound, keys[0])
 	}
 
-	return nil, ErrUnexpectedNodeKind
+	return nil, fmt.Errorf("%w: key: %s", ErrUnexpectedNodeKind, keys[0])
+}
+
+func normalizeEmptySlice[T any](v *T) {
+	if v == nil {
+		return
+	}
+
+	rv := reflect.ValueOf(v).Elem()
+	if rv.Kind() == reflect.Slice && rv.IsNil() {
+		rv.Set(reflect.MakeSlice(rv.Type(), 0, 0))
+	}
+}
+
+func deleteValue(node *yaml.Node, keys ...string) error {
+
+	if len(keys) == 0 || node == nil {
+		return ErrInvalidKeysList
+	}
+
+	if node.Kind == yaml.DocumentNode {
+		if len(node.Content) > 0 {
+			return deleteValue(node.Content[0], keys...)
+		}
+		return ErrEmptyDocumentNode
+	}
+
+	if node.Kind == yaml.SequenceNode {
+		return nil
+	}
+
+	if node.Kind == yaml.MappingNode {
+		for i := 0; i < len(node.Content); i += 2 {
+			if node.Content[i].Value == keys[0] {
+				if len(keys) == 1 {
+					node.Content = slices.Delete(node.Content, i, i+2)
+					return nil
+				}
+				valueNode := node.Content[i+1]
+				retVal := deleteValue(valueNode, keys[1:]...)
+				if retVal == nil && isEmptyNode(valueNode) {
+					node.Content = slices.Delete(node.Content, i, i+2)
+				}
+				return retVal
+			}
+		}
+		return fmt.Errorf("%w: %s", ErrKeyNotFound, keys[0])
+	}
+
+	if node.Kind == yaml.ScalarNode {
+		return fmt.Errorf("%w: remaining path: %s", ErrInvalidKeysList, strings.Join(keys, "."))
+	}
+
+	return fmt.Errorf("%w: key: %s", ErrUnexpectedNodeKind, keys[0])
+}
+
+func isEmptyNode(node *yaml.Node) bool {
+	if node.Kind == yaml.MappingNode || node.Kind == yaml.SequenceNode {
+		return len(node.Content) == 0
+	}
+	return false
 }

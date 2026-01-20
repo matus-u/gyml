@@ -65,7 +65,7 @@ func TestGetValue(t *testing.T) {
 	require.Equal(t, []int{10, 20}, *ints)
 
 	ints, err = GetValue[[]int](&root, "non_existent_ints")
-	require.Equal(t, ErrKeyNotFound, err)
+	require.ErrorIs(t, err, ErrKeyNotFound)
 	require.Nil(t, ints)
 
 	ints, err = GetValue[[]int](&rootList)
@@ -99,5 +99,34 @@ func TestGetValue(t *testing.T) {
 	ints, err = GetValue[[]int](&rootEmpty)
 	require.NoError(t, err)
 	require.Equal(t, []int{}, *ints)
+}
 
+func TestDeleteValue(t *testing.T) {
+	var root yaml.Node
+	var rootList yaml.Node
+	var rootEmpty yaml.Node
+
+	err := yaml.Unmarshal([]byte(testYAML), &root)
+	require.NoError(t, err)
+
+	err = yaml.Unmarshal([]byte(emptyYAML), &rootEmpty)
+	require.NoError(t, err)
+
+	err = yaml.Unmarshal([]byte(listYAML), &rootList)
+	require.NoError(t, err)
+
+	err = DeleteValue(&rootEmpty, "servers", "server1", "host")
+	require.ErrorIs(t, err, ErrUnexpectedNodeKind)
+
+	err = DeleteValue(&root, "servers", "server1", "host")
+	require.NoError(t, err)
+
+	err = DeleteValue(&root, "servers", "server1", "host")
+	require.ErrorIs(t, err, ErrKeyNotFound)
+
+	_, err = GetValue[string](&root, "servers", "server1", "host")
+	require.ErrorIs(t, err, ErrKeyNotFound)
+
+	err = DeleteValue(&root, "servers", "server1", "port")
+	require.NoError(t, err)
 }
