@@ -24,6 +24,7 @@ servers:
 ints:
   - 10
   - 20
+  - 30
 `
 
 const emptyYAML = ``
@@ -62,7 +63,7 @@ func TestGetValue(t *testing.T) {
 
 	ints, err := GetValue[[]int](&root, "ints")
 	require.NoError(t, err)
-	require.Equal(t, []int{10, 20}, *ints)
+	require.Equal(t, []int{10, 20, 30}, *ints)
 
 	ints, err = GetValue[[]int](&root, "non_existent_ints")
 	require.ErrorIs(t, err, ErrKeyNotFound)
@@ -72,7 +73,7 @@ func TestGetValue(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int{10, 20}, *ints)
 
-	ints, err = GetValue[[]int](&rootList, "[]")
+	ints, err = GetValue[[]int](&rootList, "[*]")
 	require.Equal(t, ErrInvalidIndexFormat, err)
 	require.Nil(t, ints)
 
@@ -88,7 +89,7 @@ func TestGetValue(t *testing.T) {
 	require.Equal(t, ErrIndexOutOfBound, err)
 	require.Nil(t, val)
 
-	val, err = GetValue[int](&rootList, "[2]")
+	val, err = GetValue[int](&rootList, "[3]")
 	require.Equal(t, ErrIndexOutOfBound, err)
 	require.Nil(t, val)
 
@@ -129,4 +130,31 @@ func TestDeleteValue(t *testing.T) {
 
 	err = DeleteValue(&root, "servers", "server1", "port")
 	require.NoError(t, err)
+
+	err = DeleteValue(&root, "ints", "[1]")
+	require.NoError(t, err)
+
+	val, err := GetValue[int](&root, "ints", "[1]")
+	require.NoError(t, err)
+	require.Equal(t, *val, 30)
+
+	err = DeleteValue(&root, "ints", "[-25]")
+	require.Equal(t, ErrIndexOutOfBound, err)
+
+	err = DeleteValue(&root, "ints", "[25]")
+	require.Equal(t, ErrIndexOutOfBound, err)
+
+	err = DeleteValue(&root, "ints")
+	require.NoError(t, err)
+
+	err = DeleteValue(&rootList, "[1]")
+	require.NoError(t, err)
+
+	val, err = GetValue[int](&rootList, "[0]")
+	require.NoError(t, err)
+	require.Equal(t, *val, 10)
+
+	err = DeleteValue(&rootList, "[1]")
+	require.Equal(t, ErrIndexOutOfBound, err)
+
 }

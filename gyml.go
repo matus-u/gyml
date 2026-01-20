@@ -56,7 +56,7 @@ func GetValue[DataType any](rootNode *yaml.Node, keys ...string) (*DataType, err
 
 }
 
-func parseValidIndex(indexStr string) (int, error) {
+func parseValidIndex(indexStr string, node *yaml.Node) (int, error) {
 	if len(indexStr) < 3 {
 		return 0, ErrInvalidIndexFormat
 	}
@@ -69,6 +69,10 @@ func parseValidIndex(indexStr string) (int, error) {
 
 	if err != nil {
 		return 0, ErrInvalidIndexFormat
+	}
+
+	if index < 0 || index >= len(node.Content) {
+		return 0, ErrIndexOutOfBound
 	}
 
 	return index, nil
@@ -89,13 +93,9 @@ func getValue(node *yaml.Node, keys ...string) (*yaml.Node, error) {
 	}
 
 	if node.Kind == yaml.SequenceNode {
-		index, err := parseValidIndex(keys[0])
+		index, err := parseValidIndex(keys[0], node)
 		if err != nil {
 			return nil, err
-		}
-
-		if index < 0 || index >= len(node.Content) {
-			return nil, ErrIndexOutOfBound
 		}
 
 		return getValue(node.Content[index], keys[1:]...)
@@ -139,7 +139,24 @@ func deleteValue(node *yaml.Node, keys ...string) error {
 	}
 
 	if node.Kind == yaml.SequenceNode {
-		return nil
+
+		index, err := parseValidIndex(keys[0], node)
+		if err != nil {
+			return err
+		}
+
+		if len(keys) == 1 {
+			node.Content = slices.Delete(node.Content, index, index+1)
+			return nil
+		}
+
+		retVal := deleteValue(node.Content[index], keys[1:]...)
+		// delete empty list itself when it is empty after deleting my last child
+		if retVal == nil && isEmptyNode(node.Content[index]) {
+			node.Content = slices.Delete(node.Content, index, index+1)
+		}
+
+		return retVal
 	}
 
 	if node.Kind == yaml.MappingNode {
@@ -151,6 +168,8 @@ func deleteValue(node *yaml.Node, keys ...string) error {
 				}
 				valueNode := node.Content[i+1]
 				retVal := deleteValue(valueNode, keys[1:]...)
+
+				// delete empty map itself when it is empty after deleting my last child
 				if retVal == nil && isEmptyNode(valueNode) {
 					node.Content = slices.Delete(node.Content, i, i+2)
 				}
@@ -161,7 +180,7 @@ func deleteValue(node *yaml.Node, keys ...string) error {
 	}
 
 	if node.Kind == yaml.ScalarNode {
-		return fmt.Errorf("%w: remaining path: %s", ErrInvalidKeysList, strings.Join(keys, "."))
+		return fmt.Errorf("%w: unresolved path: %s", ErrInvalidKeysList, strings.Join(keys, "."))
 	}
 
 	return fmt.Errorf("%w: key: %s", ErrUnexpectedNodeKind, keys[0])
