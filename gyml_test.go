@@ -158,3 +158,106 @@ func TestDeleteValue(t *testing.T) {
 	require.Equal(t, ErrIndexOutOfBound, err)
 
 }
+
+func TestSetValue(t *testing.T) {
+	var root yaml.Node
+	var rootList yaml.Node
+	var rootEmpty yaml.Node
+
+	err := yaml.Unmarshal([]byte(testYAML), &root)
+	require.NoError(t, err)
+
+	err = yaml.Unmarshal([]byte(emptyYAML), &rootEmpty)
+	require.NoError(t, err)
+
+	err = yaml.Unmarshal([]byte(listYAML), &rootList)
+	require.NoError(t, err)
+
+	err = SetValue(&root, "new-server-adress.com", "servers", "server1", "host")
+	require.NoError(t, err)
+
+	host1, err := GetValue[string](&root, "servers", "server1", "host")
+	require.NoError(t, err)
+	require.Equal(t, "new-server-adress.com", *host1)
+
+	// set to int
+	err = SetValue(&root, 12, "servers", "server1", "host")
+	require.NoError(t, err)
+
+	val, err := GetValue[int](&root, "servers", "server1", "host")
+	require.NoError(t, err)
+	require.Equal(t, *val, 12)
+
+	// set to int
+	err = SetValue(&root, []int{12, 12, 13}, "servers", "server1", "host")
+	require.NoError(t, err)
+
+	// set to list
+	valList, err := GetValue[[]int](&root, "servers", "server1", "host")
+	require.Equal(t, *valList, []int{12, 12, 13})
+	require.NoError(t, err)
+
+	// append to list
+	err = SetValue(&root, 15, "servers", "server1", "host", "[]")
+	require.NoError(t, err)
+	valList, err = GetValue[[]int](&root, "servers", "server1", "host")
+	require.Equal(t, *valList, []int{12, 12, 13, 15})
+	require.NoError(t, err)
+
+	// set at index
+	err = SetValue(&root, 15, "servers", "server1", "host", "[1]")
+	require.NoError(t, err)
+	valList, err = GetValue[[]int](&root, "servers", "server1", "host")
+	require.Equal(t, *valList, []int{12, 15, 13, 15})
+	require.NoError(t, err)
+
+	// set outside of the index index
+	err = SetValue(&root, 15, "servers", "server1", "host", "[4]")
+	require.ErrorIs(t, err, ErrIndexOutOfBound)
+
+	// cannot go to non-existent structure
+	err = SetValue(&root, 15, "servers", "server1", "host", "[]", "[]")
+	require.ErrorIs(t, err, ErrAppendInWrongPosition)
+
+	// set anonymous struct
+	err = SetValue(&root, struct{ Name string }{Name: "new-address.com"}, "servers", "server1", "host")
+	require.NoError(t, err)
+
+	valStruct, err := GetValue[struct{ Name string }](&root, "servers", "server1", "host")
+	require.Equal(t, valStruct.Name, "new-address.com")
+	require.NoError(t, err)
+
+	// create new key in map
+	err = SetValue(&root, struct{ Name string }{Name: "second-new-address.com"}, "servers", "server1", "second_host")
+	require.NoError(t, err)
+	valStruct, err = GetValue[struct{ Name string }](&root, "servers", "server1", "second_host")
+	require.Equal(t, valStruct.Name, "second-new-address.com")
+	require.NoError(t, err)
+
+	err = SetValue(&rootList, 10, "[1]")
+	require.NoError(t, err)
+
+	valList, err = GetValue[[]int](&rootList)
+	require.Equal(t, *valList, []int{10, 10})
+	require.NoError(t, err)
+
+	err = SetValue(&rootList, struct{ Name string }{Name: "third-new-address.com"})
+	require.NoError(t, err)
+
+	_, err = GetValue[struct{ Name string }](&rootList, "non-existent")
+	require.ErrorIs(t, err, ErrKeyNotFound)
+
+	// different error than above because this is really undefined document
+	_, err = GetValue[string](&rootEmpty, "non-existent")
+	require.ErrorIs(t, err, ErrUnexpectedNodeKind)
+
+	err = SetValue(&rootEmpty, map[string]string{"key": "value"})
+	require.NoError(t, err)
+
+	_, err = GetValue[string](&rootEmpty, "non-existent")
+	require.ErrorIs(t, err, ErrKeyNotFound)
+
+	s, err := GetValue[string](&rootEmpty, "key")
+	require.Equal(t, *s, "value")
+	require.NoError(t, err)
+}

@@ -12,14 +12,16 @@ import (
 )
 
 var (
-	ErrRootNodeNotSet     = errors.New("rootNode not set")
-	ErrKeyNotFound        = errors.New("key not found")
-	ErrEmptyDocumentNode  = errors.New("empty document node provided")
-	ErrUnexpectedNodeKind = errors.New("unexpected node kind provided")
-	ErrInvalidIndexFormat = errors.New("invalid index format")
-	ErrIndexOutOfBound    = errors.New("provided index out of bound")
-	ErrInvalidKeysList    = errors.New("invalid keys list")
-	ErrScalarSetAttempt   = errors.New("cannot iterate over scalar node")
+	ErrRootNodeNotSet        = errors.New("rootNode not set")
+	ErrKeyNotFound           = errors.New("key not found")
+	ErrEmptyDocumentNode     = errors.New("empty document node provided")
+	ErrUnexpectedNodeKind    = errors.New("unexpected node kind provided")
+	ErrInvalidIndexFormat    = errors.New("invalid index format")
+	ErrIndexOutOfBound       = errors.New("provided index out of bound")
+	ErrInvalidKeysList       = errors.New("invalid keys list")
+	ErrScalarSetAttempt      = errors.New("cannot iterate over scalar node")
+	ErrCannotEncodeData      = errors.New("cannot marshall provided data to yaml")
+	ErrAppendInWrongPosition = errors.New("cannot append in the middle of the keys")
 )
 
 // Returns error on failure
@@ -34,10 +36,6 @@ var (
 // SetValue(&root, 12, "some_list", "[8]") - set 12 in some_list at index[8] (range check involved)
 // SetValue(&root, "Matus", "Company", "CEO", "Name") - scalar value settings at /Company/CEO/Name to Matus
 func SetValue[DataType any](root *yaml.Node, data DataType, keys ...string) error {
-	if len(keys) == 0 {
-		return ErrInvalidKeysList
-	}
-
 	if root == nil {
 		return ErrRootNodeNotSet
 	}
@@ -102,17 +100,54 @@ func parseValidIndex(indexStr string, node *yaml.Node) (int, error) {
 	return index, nil
 }
 
-func setValue[DataType any](root *yaml.Node, data DataType, keys ...string) error {
-	if root.Kind == yaml.ScalarNode {
+func setValue[DataType any](node *yaml.Node, data DataType, keys ...string) error {
+
+	if len(keys) == 0 {
+		contentNode, err := createContentNode(data)
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrCannotEncodeData, err)
+		}
+		*node = *contentNode
+		return nil
+	}
+
+	if node.Kind == yaml.MappingNode {
+		for i := 0; i < len(node.Content); i += 2 {
+			if node.Content[i].Value == keys[0] {
+				return setValue(node.Content[i+1], data, keys[1:]...)
+			}
+		}
+
+		return appendDataToContent(node, data, keys...)
+	}
+
+	if node.Kind == yaml.SequenceNode {
+
+		if keys[0] == "[]" {
+			if len(keys) == 1 {
+				return appendDataToContent(node, data, keys...)
+			}
+			return fmt.Errorf("%w: following key: %s", ErrAppendInWrongPosition, keys[1])
+		}
+
+		index, err := parseValidIndex(keys[0], node)
+		if err != nil {
+			return err
+		}
+
+		return setValue(node.Content[index], data, keys[1:]...)
+	}
+
+	if node.Kind == yaml.ScalarNode {
 		return fmt.Errorf("%w: %s", ErrScalarSetAttempt, keys[0])
 	}
 
-	if root.Kind == yaml.DocumentNode {
-		if len(root.Content) > 0 {
-			return setValue(root.Content[0], data, keys...)
+	if node.Kind == yaml.DocumentNode {
+		if len(node.Content) > 0 {
+			return setValue(node.Content[0], data, keys...)
 		}
 
-		return appendDataToContent(root, data, keys...)
+		return appendDataToContent(node, data, keys...)
 	}
 
 	return fmt.Errorf("%w: key: %s", ErrUnexpectedNodeKind, keys[0])
@@ -252,7 +287,7 @@ func createTypedEnvelope[DataType any](data DataType, restKeys ...string) any {
 	return map[string]any{restKeys[0]: createTypedEnvelope(data, restKeys[1:]...)}
 }
 
-// wrap any data in ContentNode to add/append to another Node
+// wrap any data in ContentNode to set/append to another Node
 func createContentNode[DataType any](data DataType) (*yaml.Node, error) {
 	node := yaml.Node{}
 	if err := node.Encode(data); err != nil {
