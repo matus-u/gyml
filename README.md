@@ -1,7 +1,7 @@
 # ⚙️ gyml: Generic YAML Manipulator
 
-![Go](https://github.com/matusvarga/gyml/workflows/Go/badge.svg)
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/matusvarga/gyml)
+![Go](https://github.com/matus-u/gyml/workflows/Go/badge.svg)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/matus-u/gyml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `gyml` is a lightweight Go library designed for intuitive and flexible manipulation of YAML files using path-based lookups. Say goodbye to cumbersome struct definitions for every YAML configuration – `gyml` allows you to access, set, and delete values within any YAML document without needing to know its full structure beforehand.
@@ -20,7 +20,7 @@
 To integrate `gyml` into your Go project, simply run the following command:
 
 ```bash
-go get github.com/matusvarga/gyml
+go get github.com/matus-u/gyml
 ```
 
 ## 📚 Usage
@@ -39,7 +39,7 @@ import (
 	"log"
 
 	"gopkg.in/yaml.v3"
-	"github.com/matusvarga/gyml"
+	"github.com/matus-u/gyml"
 )
 
 func main() {
@@ -94,7 +94,7 @@ import (
 	"log"
 
 	"gopkg.in/yaml.v3"
-	"github.com/matusvarga/gyml"
+	"github.com/matus-u/gyml"
 )
 
 func main() {
@@ -169,7 +169,7 @@ import (
 	"log"
 
 	"gopkg.in/yaml.v3"
-	"github.com/matusvarga/gyml"
+	"github.com/matus-u/gyml"
 )
 
 func main() {
@@ -257,7 +257,7 @@ import (
 	"log"
 
 	"gopkg.in/yaml.v3"
-	"github.com/matusvarga/gyml"
+	"github.com/matus-u/gyml"
 )
 
 func main() {
