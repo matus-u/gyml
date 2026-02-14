@@ -26,61 +26,6 @@ go get github.com/matus-u/gyml
 
 Here's how you can use `gyml` to manipulate your YAML data:
 
-### Initializing a YAML Document
-
-You can start with an empty YAML node or parse an existing YAML string:
-
-```go
-package main
-
-import (
-	"fmt"
-	"log"
-
-	"gopkg.in/yaml.v3"
-	"github.com/matus-u/gyml"
-)
-
-func main() {
-	// Start with an empty root node
-	var root yaml.Node
-	fmt.Println("Initial YAML:", toYAMLString(&root))
-
-	// Or parse an existing YAML string
-	yamlString := `
-application:
-  name: MyWebApp
-  version: 1.0.0
-database:
-  host: localhost
-  port: 5432
-  users:
-    - name: admin
-      role: superuser
-    - name: guest
-      role: readonly
-`
-	var parsedRoot yaml.Node
-	err := yaml.Unmarshal([]byte(yamlString), &parsedRoot)
-	if err != nil {
-		log.Fatalf("Error unmarshaling YAML: %v", err)
-	}
-	fmt.Println("Parsed YAML:", toYAMLString(&parsedRoot))
-}
-
-// Helper to convert yaml.Node back to string for printing
-func toYAMLString(node *yaml.Node) string {
-	if len(node.Content) == 0 {
-		return "{}" // Represent empty YAML as an empty map
-	}
-	data, err := yaml.Marshal(node)
-	if err != nil {
-		return fmt.Sprintf("Error marshaling: %v", err)
-	}
-	return string(data)
-}
-```
-
 ### Setting Values
 
 Use `gyml.SetValue` to add or modify values. Intermediate nodes will be created as needed.
