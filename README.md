@@ -1,6 +1,5 @@
 # ⚙️ gyml: Generic YAML Manipulator
 
-![Go](https://github.com/matus-u/gyml/workflows/Go/badge.svg)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/matus-u/gyml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
