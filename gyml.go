@@ -24,17 +24,35 @@ var (
 	ErrAppendInWrongPosition = errors.New("cannot append in the middle of the keys")
 )
 
-// Returns error on failure
+// SetValue is used to set values on a key's path within a YAML node.
+// If a part of the path does not exist, it is created with the correct type
+// based on the key (e.g., "[]" for a sequence, "name" for a map).
+//
+// root: The root YAML node to modify.
+// data: The data to be inserted, which can be any type serializable into YAML
+//
+//	(ScalarType, MapType, SeqType).
+//
+// keys: A list of keys defining the path in the YAML structure where the value
+//
+//	should be set.
+//
 // Examples:
-// SetValue is used to set values on key's path, if some part of the path does not exist, it is created with correct type based on the keys ([] -> sequence type, "name" -> map type)
-// node - root of yaml
-// data - data to be inserted, can be any type that is serializable into yaml (ScalarType, MapType, SeqType)
-// keys - path in yaml as a list of keys that define place of the the value in yaml
-// Examples:
-// SetValue(&root, TestSomeStruct{Name: "Adam", Age: 30}, "Company", "CEO") - set TestSomeStruct on /Company/CEO
-// SetValue(&root, 35, "some_list", "[]") - append new item 35 to some_list sequence
-// SetValue(&root, 12, "some_list", "[8]") - set 12 in some_list at index[8] (range check involved)
-// SetValue(&root, "Matus", "Company", "CEO", "Name") - scalar value settings at /Company/CEO/Name to Matus
+//
+//	SetValue(&root, TestSomeStruct{Name: "Adam", Age: 30}, "Company", "CEO")
+//	  - Sets TestSomeStruct at the path /Company/CEO.
+//	SetValue(&root, 35, "some_list", "[]")
+//	  - Appends the item 35 to the "some_list" sequence.
+//	SetValue(&root, 12, "some_list", "[8]")
+//	  - Sets the value 12 at index 8 in "some_list" (with range checking).
+//	SetValue(&root, "Matus", "Company", "CEO", "Name")
+//	  - Sets the scalar value "Matus" at /Company/CEO/Name.
+//	SetValue(&root, true, "settings", "notifications")
+//	  - Sets a boolean value 'true' at /settings/notifications.
+//	SetValue(&root, 3.14, "math", "pi")
+//	  - Sets a float value '3.14' at /math/pi.
+//	SetValue(&root, map[string]string{"city": "London", "country": "UK"}, "user", "address")
+//	  - Sets a nested map at /user/address.
 func SetValue[DataType any](root *yaml.Node, data DataType, keys ...string) error {
 	if root == nil {
 		return ErrRootNodeNotSet
@@ -43,6 +61,10 @@ func SetValue[DataType any](root *yaml.Node, data DataType, keys ...string) erro
 	return setValue(root, data, keys...)
 }
 
+// DeleteValue removes a value from a YAML node at the specified path.
+//
+// root: The root YAML node from which to delete the value.
+// keys: A list of keys defining the path to the value to be deleted.
 func DeleteValue(root *yaml.Node, keys ...string) error {
 
 	if len(keys) == 0 {
@@ -55,9 +77,23 @@ func DeleteValue(root *yaml.Node, keys ...string) error {
 	return deleteValue(root, keys...)
 }
 
-// Returns values on the path defined by list of keys
+// GetValue retrieves a value from a YAML node at the path defined by a list of keys.
+// The retrieved value is deserialized into the specified DataType.
+//
+// rootNode: The root YAML node from which to retrieve the value.
+// keys:     A list of keys defining the path to the desired value.
+//
 // Examples:
-// GetValue[int](&number, "persons_list", "[10]", "age") - get age property of 10th person in person_list, deserialize to *int
+//
+//	GetValue[int](&number, "persons_list", "[10]", "age")
+//	  - Retrieves the "age" property of the 10th person in "persons_list"
+//	    and deserializes it into an *int.
+//	GetValue[bool](&notificationsEnabled, "settings", "notifications")
+//	  - Retrieves a boolean value from /settings/notifications.
+//	GetValue[float64](&piValue, "math", "pi")
+//	  - Retrieves a float64 value from /math/pi.
+//	GetValue[string](&city, "user", "address", "city")
+//	  - Retrieves a string value from /user/address/city.
 func GetValue[DataType any](rootNode *yaml.Node, keys ...string) (*DataType, error) {
 
 	if rootNode == nil {
