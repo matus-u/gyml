@@ -26,6 +26,21 @@ go get github.com/matus-u/gyml
 
 Here's how you can use `gyml` to manipulate your YAML data:
 
+### Key Path Examples
+
+The following examples demonstrate how to use key paths to target specific nodes in your YAML structure, as described in the package documentation:
+
+- `SetValue(&root, data, "Company", "CEO")` - Sets a value at the path `/Company/CEO`.
+- `SetValue(&root, 35, "some_list", "[]")` - Appends an item to the `some_list` sequence.
+- `SetValue(&root, 12, "some_list", "[8]")` - Sets a value at index 8 in `some_list`.
+- `GetValue[int](&root, "persons_list", "[10]", "age")` - Retrieves the `age` of the 10th person in `persons_list`.
+- `GetValue[string](&root, "user", "address", "city")` - Retrieves a value from `/user/address/city`.
+- `SetValue(&root, true, "settings", "notifications")` - Sets a boolean value `true` at `/settings/notifications`.
+- `SetValue(&root, 3.14, "math", "pi")` - Sets a float value `3.14` at `/math/pi`.
+- `DeleteValue(&root, "database", "users", "[0]")` - Deletes the first item from the `users` sequence.
+- `DeleteValue(&root, "database", "users")` - Deletes the entire `users` sequence from the `database` map.
+- `DeleteValue(&root, "database", "port")` - Deletes the `port` value from the `database` map.
+
 ### Setting Values
 
 Use `gyml.SetValue` to add or modify values. Intermediate nodes will be created as needed.
